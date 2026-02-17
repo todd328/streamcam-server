@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>StreamCam</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08080a;
+  --s1: #0f0f13;
+  --s2: #16161c;
+  --border: #1e1e28;
+  --border2: #2a2a38;
+  --text: #e8e8f0;
+  --muted: #5a5a78;
+  --accent: #5b6ef5;
+  --accent2: #7c3aed;
+  --green: #10d98c;
+  --red: #f43f5e;
+  --amber: #f59e0b;
+  --mono: 'JetBrains Mono', monospace;
+  --display: 'Syne', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { background:var(--bg); color:var(--text); font-family:var(--mono); min-height:100vh; overflow-x:hidden; }
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size:200px; opacity:.35;
+}
+.page { display:none; min-height:100vh; }
+.page.active { display:flex; }
+
+/* ─── AUTH ─── */
+#authPage {
+  flex-direction:column; align-items:center; justify-content:center; padding:24px;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 80%, rgba(91,110,245,.08) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 20%, rgba(124,58,237,.07) 0%, transparent 60%);
+}
+.auth-wrap { width:100%; max-width:420px; }
+.auth-header { margin-bottom:40px; }
+.eyebrow { font-size:10px; letter-spacing:4px; text-transform:uppercase; color:var(--accent); margin-bottom:12px; }
+.auth-header h1 {
+  font-family:var(--display); font-size:42px; font-weight:800; letter-spacing:-2px; line-height:1;
+  background:linear-gradient(135deg, var(--text) 0%, var(--muted) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.auth-header p { font-size:12px; color:var(--muted); margin-top:10px; line-height:1.6; }
+.auth-box {
+  background:var(--s1); border:1px solid var(--border); border-radius:16px;
+  padding:32px; position:relative; overflow:hidden;
+}
+.auth-box::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(91,110,245,.5), transparent);
+}
+.field { margin-bottom:18px; }
+.field label { display:block; font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+.field input {
+  width:100%; padding:12px 16px; background:var(--bg); border:1px solid var(--border2);
+  border-radius:10px; color:var(--text); font-family:var(--mono); font-size:14px;
+  transition:border .2s, box-shadow .2s;
+}
+.field input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(91,110,245,.12); }
+
+/* Server URL field */
+.server-field { margin-bottom:18px; }
+.server-field label { display:block; font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+.server-field input {
+  width:100%; padding:12px 16px; background:var(--bg); border:1px solid var(--border2);
+  border-radius:10px; color:var(--accent); font-family:var(--mono); font-size:12px;
+  transition:border .2s;
+}
+.server-field input:focus { outline:none; border-color:var(--accent); }
+.server-status { display:flex; align-items:center; gap:6px; margin-top:6px; font-size:10px; color:var(--muted); }
+.server-status .dot { width:6px; height:6px; border-radius:50%; background:var(--muted); }
+.server-status .dot.ok { background:var(--green); }
+.server-status .dot.err { background:var(--red); }
+.server-status .dot.checking { background:var(--amber); animation:blink 1s infinite; }
+
+.btn-auth {
+  width:100%; padding:14px;
+  background:linear-gradient(135deg, var(--accent), var(--accent2));
+  border:none; border-radius:10px; color:#fff; font-family:var(--mono);
+  font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  cursor:pointer; transition:opacity .2s, transform .1s; margin-top:4px;
+}
+.btn-auth:hover { opacity:.9; }
+.btn-auth:active { transform:scale(.98); }
+.err { display:none; background:rgba(244,63,94,.08); border:1px solid rgba(244,63,94,.2); color:#fda4af; font-size:12px; padding:10px 14px; border-radius:8px; margin-bottom:16px; }
+.creds-hint { margin-top:20px; padding:14px 16px; background:rgba(91,110,245,.05); border:1px solid rgba(91,110,245,.12); border-radius:10px; font-size:11px; color:var(--muted); text-align:center; line-height:1.8; }
+.creds-hint b { color:#a5b4fc; }
+.mode-link { text-align:center; margin-top:20px; }
+.mode-link button { background:none; border:none; color:var(--muted); font-size:11px; font-family:var(--mono); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.mode-link button:hover { color:var(--text); }
+
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.4} }
+@keyframes livepulse { 0%,100%{box-shadow:0 0 0 0 rgba(16,217,140,.4)}50%{box-shadow:0 0 0 6px rgba(16,217,140,0)} }
+
+/* ─── DASHBOARD ─── */
+#dashPage { flex-direction:column; }
+.topbar {
+  height:56px; display:flex; align-items:center; padding:0 24px; gap:16px;
+  background:rgba(8,8,10,.8); backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; flex-shrink:0;
+}
+.topbar-logo { font-family:var(--display); font-size:18px; font-weight:800; letter-spacing:-1px; }
+.topbar-logo span { color:var(--accent); }
+.topbar-tag { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); padding:3px 8px; border:1px solid var(--border2); border-radius:4px; }
+.flex1 { flex:1; }
+.live-pill {
+  display:flex; align-items:center; gap:7px; padding:5px 13px; border-radius:20px;
+  background:var(--s2); border:1px solid var(--border2);
+  font-size:11px; font-weight:700; color:var(--muted); letter-spacing:.5px; text-transform:uppercase;
+}
+.live-pill.on { background:rgba(16,217,140,.06); border-color:rgba(16,217,140,.2); color:var(--green); }
+.live-pill .lpd { width:7px; height:7px; border-radius:50%; background:var(--muted); }
+.live-pill.on .lpd { background:var(--green); animation:livepulse 2s infinite; }
+.ws-indicator { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted); }
+.ws-indicator .wsd { width:6px; height:6px; border-radius:50%; background:var(--muted); }
+.ws-indicator.connected .wsd { background:var(--green); }
+.ws-indicator.connecting .wsd { background:var(--amber); animation:blink 1s infinite; }
+.ws-indicator.error .wsd { background:var(--red); }
+.btn-logout { background:none; border:1px solid var(--border2); color:var(--muted); padding:5px 14px; border-radius:8px; font-size:11px; font-family:var(--mono); cursor:pointer; transition:all .2s; }
+.btn-logout:hover { color:var(--text); }
+
+.dash-layout { flex:1; display:grid; grid-template-columns:1fr 300px; overflow:hidden; }
+@media(max-width:860px){ .dash-layout { grid-template-columns:1fr; } .sidebar { display:none; } }
+.main-col { padding:20px; display:flex; flex-direction:column; gap:16px; overflow-y:auto; }
+
+.video-shell {
+  background:#000; border-radius:14px; border:1px solid var(--border);
+  aspect-ratio:16/9; position:relative; overflow:hidden; flex-shrink:0;
+}
+.video-shell video { width:100%; height:100%; object-fit:contain; display:block; }
+.no-stream { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; background:var(--s1); }
+.no-stream .icon { font-size:40px; opacity:.15; }
+.no-stream p { font-size:12px; color:var(--muted); letter-spacing:1px; }
+.vid-live-badge {
+  position:absolute; top:12px; left:12px; background:var(--red); color:#fff;
+  padding:3px 9px; border-radius:5px; font-size:10px; font-weight:800; letter-spacing:2px; display:none;
+}
+.vid-live-badge .rd { display:inline-block; width:5px; height:5px; border-radius:50%; background:#fff; margin-right:5px; animation:blink 1s infinite; }
+.vid-overlay-stats {
+  position:absolute; bottom:12px; right:12px; background:rgba(0,0,0,.75);
+  backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,.06); border-radius:8px;
+  padding:7px 12px; font-size:10px; color:rgba(255,255,255,.6); display:none; line-height:1.8;
+}
+.connect-card { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:22px; }
+.connect-card h3 { font-family:var(--display); font-size:16px; font-weight:700; margin-bottom:6px; }
+.connect-card .cc-sub { font-size:11px; color:var(--muted); line-height:1.6; margin-bottom:18px; }
+.pin-row { display:flex; gap:10px; }
+.pin-input {
+  flex:1; padding:12px 16px; background:var(--bg); border:1px solid var(--border2);
+  border-radius:10px; color:var(--accent); font-family:var(--mono); font-size:24px;
+  font-weight:800; letter-spacing:8px; text-align:center; transition:border .2s, box-shadow .2s;
+}
+.pin-input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(91,110,245,.12); }
+.btn-conn {
+  padding:12px 20px; background:var(--accent); color:#fff; border:none; border-radius:10px;
+  font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  cursor:pointer; transition:opacity .2s; white-space:nowrap;
+}
+.btn-conn:hover { opacity:.85; }
+.btn-conn:disabled { opacity:.4; cursor:not-allowed; }
+.btn-disc {
+  padding:12px 20px; background:var(--bg); color:var(--red); border:1px solid rgba(244,63,94,.2);
+  border-radius:10px; font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:1px;
+  text-transform:uppercase; cursor:pointer; display:none; white-space:nowrap;
+}
+.conn-state { display:flex; align-items:center; gap:8px; margin-top:12px; }
+.csd { width:6px; height:6px; border-radius:50%; background:var(--border2); flex-shrink:0; }
+.csd.connecting { background:var(--amber); animation:blink 1s infinite; }
+.csd.connected { background:var(--green); }
+.csd.error { background:var(--red); }
+.conn-state span { font-size:11px; color:var(--muted); }
+
+/* SIDEBAR */
+.sidebar { background:var(--s1); border-left:1px solid var(--border); padding:20px; display:flex; flex-direction:column; gap:22px; overflow-y:auto; }
+.sb-section h4 { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:var(--muted); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+.meta-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; }
+.meta-row + .meta-row { border-top:1px solid var(--border); }
+.meta-row .mk { font-size:11px; color:var(--muted); }
+.meta-row .mv { font-size:11px; font-weight:700; color:var(--text); }
+.steps-list { display:flex; flex-direction:column; gap:12px; }
+.step-item { display:flex; gap:12px; }
+.step-num { width:20px; height:20px; border-radius:50%; background:rgba(91,110,245,.12); color:var(--accent); font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+.step-item p { font-size:11px; color:var(--muted); line-height:1.7; }
+.step-item p strong { color:var(--text); display:block; font-size:12px; margin-bottom:1px; }
+.url-row { background:var(--bg); border:1px solid var(--border2); border-radius:8px; padding:10px 12px; display:flex; align-items:center; gap:8px; }
+.url-row span { font-size:10px; color:var(--muted); font-family:var(--mono); word-break:break-all; flex:1; }
+.btn-copy { background:var(--border2); border:none; color:var(--text); padding:5px 10px; border-radius:6px; font-size:10px; font-family:var(--mono); font-weight:700; cursor:pointer; white-space:nowrap; }
+.btn-copy:hover { background:var(--accent); }
+.note { font-size:10px; color:#383848; line-height:1.6; margin-top:8px; }
+
+/* ─── CAMERA PAGE ─── */
+#camPage {
+  flex-direction:column; align-items:center; justify-content:center; padding:20px; min-height:100vh;
+  background:
+    radial-gradient(ellipse 50% 40% at 10% 90%, rgba(91,110,245,.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 90% 10%, rgba(16,217,140,.05) 0%, transparent 60%);
+}
+.cam-wrap { width:100%; max-width:380px; }
+.cam-eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:20px; text-align:center; }
+.cam-card { background:var(--s1); border:1px solid var(--border); border-radius:20px; padding:26px 22px; position:relative; overflow:hidden; }
+.cam-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg, transparent, rgba(16,217,140,.3), transparent); }
+.cam-status-row { display:flex; align-items:center; gap:8px; margin-bottom:18px; }
+.cam-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
+.cam-dot.live { background:var(--green); animation:livepulse 1.5s infinite; }
+.cam-label { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+.cam-label.live { color:var(--green); }
+.cam-card h2 { font-family:var(--display); font-size:24px; font-weight:800; letter-spacing:-1px; margin-bottom:6px; }
+.cam-card .cam-sub { font-size:12px; color:var(--muted); line-height:1.6; margin-bottom:20px; }
+.cam-server-row { margin-bottom:16px; }
+.cam-server-row label { display:block; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.cam-server-row input { width:100%; padding:10px 12px; background:var(--bg); border:1px solid var(--border2); border-radius:8px; color:var(--accent); font-family:var(--mono); font-size:11px; }
+.cam-server-row input:focus { outline:none; border-color:var(--accent); }
+.cam-server-status { display:flex; align-items:center; gap:6px; margin-top:5px; font-size:10px; color:var(--muted); }
+.cam-server-status .cssd { width:5px; height:5px; border-radius:50%; background:var(--muted); }
+.cam-server-status .cssd.ok { background:var(--green); }
+.cam-server-status .cssd.err { background:var(--red); }
+.cam-server-status .cssd.checking { background:var(--amber); animation:blink 1s infinite; }
+.cam-preview { width:100%; aspect-ratio:16/9; border-radius:10px; background:#000; display:none; object-fit:cover; margin-bottom:16px; }
+.btn-cam { width:100%; padding:14px; border-radius:10px; border:none; font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all .2s; }
+.btn-cam-go { background:linear-gradient(135deg, var(--accent), var(--accent2)); color:#fff; }
+.btn-cam-go:disabled { opacity:.4; cursor:not-allowed; }
+.btn-cam-stop { background:var(--bg); color:var(--red); border:1px solid rgba(244,63,94,.2); display:none; }
+.pin-shell { margin-top:16px; background:var(--bg); border:1px solid var(--border2); border-radius:12px; padding:16px; text-align:center; display:none; }
+.pin-shell label { font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:8px; }
+.big-pin { font-size:44px; font-weight:800; color:var(--accent); letter-spacing:12px; }
+.cam-stats-row { display:flex; gap:8px; margin-top:14px; }
+.cam-stat-box { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 8px; text-align:center; }
+.cam-stat-box label { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:4px; }
+.cam-stat-box span { font-size:12px; font-weight:700; color:var(--text); }
+.cam-log-area { margin-top:14px; font-size:9px; color:#2a2a3a; text-align:left; max-height:60px; overflow-y:auto; line-height:1.9; }
+.switch-link { text-align:center; margin-top:16px; }
+.switch-link button { background:none; border:none; color:var(--muted); font-size:11px; font-family:var(--mono); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div class="page active" id="authPage">
+  <div class="auth-wrap">
+    <div class="auth-header">
+      <div class="eyebrow">// Remote Webcam System</div>
+      <h1>Stream<br>Cam</h1>
+      <p>Live iPhone camera → dashboard,<br>any network, anywhere.</p>
+    </div>
+    <div class="auth-box">
+      <div class="err" id="errMsg">Invalid credentials.</div>
+      <div class="server-field">
+        <label>Signaling Server URL</label>
+        <input type="text" id="serverUrl" placeholder="wss://your-server.railway.app" autocomplete="off">
+        <div class="server-status">
+          <div class="dot" id="serverDot"></div>
+          <span id="serverStatusText">Not checked</span>
+        </div>
+      </div>
+      <div class="field"><label>Username</label><input type="text" id="loginUser" placeholder="admin" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
+      <button class="btn-auth" onclick="login()">Sign In →</button>
+      <div class="creds-hint">Demo: <b>admin</b> / <b>admin123</b> &nbsp;·&nbsp; <b>viewer</b> / <b>view123</b></div>
+    </div>
+    <div class="mode-link"><button onclick="showCamPage()">📱 Switch to iPhone Camera mode</button></div>
+  </div>
+</div>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="page" id="dashPage">
+  <div class="topbar">
+    <div class="topbar-logo">Stream<span>Cam</span></div>
+    <div class="topbar-tag">Dashboard</div>
+    <div class="flex1"></div>
+    <div class="ws-indicator" id="wsIndicator"><div class="wsd"></div><span id="wsText">WS —</span></div>
+    <div class="live-pill" id="livePill"><div class="lpd"></div><span id="livePillText">No Stream</span></div>
+    <button class="btn-logout" onclick="logout()">Sign Out</button>
+  </div>
+  <div class="dash-layout">
+    <div class="main-col">
+      <div class="video-shell">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div class="no-stream" id="noStream"><div class="icon">📹</div><p>// Awaiting stream connection</p></div>
+        <div class="vid-live-badge" id="vidBadge"><span class="rd"></span>LIVE</div>
+        <div class="vid-overlay-stats" id="vidStats"></div>
+      </div>
+      <div class="connect-card">
+        <h3>Connect to iPhone</h3>
+        <p class="cc-sub">Open the Camera URL on your iPhone in Safari, tap Start, then enter the 4-digit PIN below.</p>
+        <div class="pin-row">
+          <input class="pin-input" id="pinField" type="tel" maxlength="4" placeholder="0000" oninput="this.value=this.value.replace(/\D/g,'')">
+          <button class="btn-conn" id="btnConn" onclick="dashConnect()">Connect</button>
+          <button class="btn-disc" id="btnDisc" onclick="dashDisconnect()">End</button>
+        </div>
+        <div class="conn-state"><div class="csd" id="csd"></div><span id="connMsg">Enter PIN above to connect</span></div>
+      </div>
+    </div>
+    <div class="sidebar">
+      <div class="sb-section">
+        <h4>Stream Info</h4>
+        <div class="meta-row"><span class="mk">Status</span><span class="mv" id="smStat">—</span></div>
+        <div class="meta-row"><span class="mk">Resolution</span><span class="mv" id="smRes">—</span></div>
+        <div class="meta-row"><span class="mk">Framerate</span><span class="mv" id="smFps">—</span></div>
+        <div class="meta-row"><span class="mk">Connected at</span><span class="mv" id="smTime">—</span></div>
+        <div class="meta-row"><span class="mk">Session PIN</span><span class="mv" id="smPin">—</span></div>
+      </div>
+      <div class="sb-section">
+        <h4>Setup Steps</h4>
+        <div class="steps-list">
+          <div class="step-item"><div class="step-num">1</div><p><strong>Deploy the server</strong>Use Railway, Render, or run locally. Paste the WSS URL here and on the camera page.</p></div>
+          <div class="step-item"><div class="step-num">2</div><p><strong>Open Camera URL on iPhone</strong>Copy the link below and open in Safari on your iPhone.</p></div>
+          <div class="step-item"><div class="step-num">3</div><p><strong>Start + enter PIN</strong>Tap broadcast on iPhone, type the PIN here to connect.</p></div>
+        </div>
+      </div>
+      <div class="sb-section">
+        <h4>iPhone Camera URL</h4>
+        <div class="url-row"><span id="camUrlDisplay">—</span><button class="btn-copy" onclick="copyUrl()">Copy</button></div>
+        <p class="note">Share this URL with your iPhone. The server URL is embedded automatically.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CAMERA (iPhone) ═══ -->
+<div class="page" id="camPage">
+  <div class="cam-wrap">
+    <div class="cam-eyebrow">// iPhone Camera Mode</div>
+    <div class="cam-card">
+      <div class="cam-status-row">
+        <div class="cam-dot" id="camDot"></div>
+        <div class="cam-label" id="camLabel">Offline</div>
+      </div>
+      <h2 id="camTitle">iPhone Camera</h2>
+      <p class="cam-sub" id="camSub">Enter your server URL, then tap Start to go live.</p>
+      <div class="cam-server-row">
+        <label>Signaling Server URL</label>
+        <input type="text" id="camServerUrl" placeholder="wss://your-server.railway.app" autocomplete="off">
+        <div class="cam-server-status"><div class="cssd" id="cssd"></div><span id="cssText">Not checked</span></div>
+      </div>
+      <video id="camPreview" class="cam-preview" autoplay muted playsinline></video>
+      <button class="btn-cam btn-cam-go" id="btnCamStart" onclick="startCam()">▶ Start Broadcasting</button>
+      <button class="btn-cam btn-cam-stop" id="btnCamStop" onclick="stopCam()">■ Stop Broadcasting</button>
+      <div class="pin-shell" id="pinShell">
+        <label>Dashboard PIN</label>
+        <div class="big-pin" id="bigPin">----</div>
+      </div>
+      <div class="cam-stats-row" id="camStatsRow" style="display:none">
+        <div class="cam-stat-box"><label>Resolution</label><span id="cRes">--</span></div>
+        <div class="cam-stat-box"><label>Camera</label><span id="cCam">--</span></div>
+        <div class="cam-stat-box"><label>Viewers</label><span id="cViewers">0</span></div>
+      </div>
+      <div class="cam-log-area" id="camLog"></div>
+    </div>
+    <div class="switch-link"><button onclick="showAuth()">🖥️ Go to Dashboard</button></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  CONFIG — set your deployed server URL here
+//  or enter it in the UI fields at runtime
+// ═══════════════════════════════════════════════════
+const DEFAULT_SERVER = '';  // e.g. 'wss://streamcam.railway.app'
+const CREDS = { admin: 'admin123', viewer: 'view123' };
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' }
+];
+
+// ═══════════════════════════════════════════════════
+//  PAGE ROUTING
+// ═══════════════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showAuth()    { showPage('authPage'); }
+function showDash()    { showPage('dashPage'); }
+function showCamPage() { showPage('camPage'); }
+
+// Pre-fill server URL from query param or stored value
+const qp = new URLSearchParams(location.search);
+const qServer = qp.get('server') || localStorage.getItem('sc_server') || DEFAULT_SERVER;
+const qMode   = qp.get('mode');
+
+if (qServer) {
+  document.getElementById('serverUrl').value = qServer;
+  document.getElementById('camServerUrl').value = qServer;
+}
+
+if (qMode === 'camera') {
+  showCamPage();
+} else if (sessionStorage.getItem('sc_user')) {
+  showDash();
+  initDash();
+}
+
+// Server URL check
+function checkServer(url, dotId, textId) {
+  if (!url) return;
+  const dot = document.getElementById(dotId);
+  const txt = document.getElementById(textId);
+  dot.className = dot.className.replace(/\b(ok|err|checking)\b/g, '') + ' checking';
+  txt.textContent = 'Checking...';
+  const httpUrl = url.replace('wss://', 'https://').replace('ws://', 'http://') + '/health';
+  fetch(httpUrl, { signal: AbortSignal.timeout(5000) })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        dot.className = dot.className.replace(/\b(ok|err|checking)\b/g, '') + ' ok';
+        txt.textContent = `Connected · ${data.activeSessions} active sessions`;
+      } else throw new Error();
+    })
+    .catch(() => {
+      dot.className = dot.className.replace(/\b(ok|err|checking)\b/g, '') + ' err';
+      txt.textContent = 'Cannot reach server';
+    });
+}
+
+document.getElementById('serverUrl').addEventListener('blur', e => {
+  checkServer(e.target.value.trim(), 'serverDot', 'serverStatusText');
+});
+document.getElementById('camServerUrl').addEventListener('blur', e => {
+  checkServer(e.target.value.trim(), 'cssd', 'cssText');
+});
+
+// ═══════════════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════════════
+function login() {
+  const u   = document.getElementById('loginUser').value.trim();
+  const p   = document.getElementById('loginPass').value;
+  const srv = document.getElementById('serverUrl').value.trim();
+  const err = document.getElementById('errMsg');
+
+  if (!srv) { err.textContent = 'Enter your signaling server URL first.'; err.style.display = 'block'; return; }
+  if (!CREDS[u] || CREDS[u] !== p) { err.style.display = 'block'; err.textContent = 'Invalid credentials.'; document.getElementById('loginPass').value = ''; return; }
+
+  err.style.display = 'none';
+  localStorage.setItem('sc_server', srv);
+  localStorage.setItem('sc_serverurl', srv);
+  sessionStorage.setItem('sc_user', u);
+  showDash();
+  initDash();
+}
+
+['loginUser','loginPass'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') login(); });
+});
+
+function logout() {
+  sessionStorage.removeItem('sc_user');
+  dashDisconnect(true);
+  if (dashWS) { dashWS.close(); dashWS = null; }
+  showAuth();
+}
+
+// ═══════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════
+let dashWS = null, dashPC = null, statsIv = null, currentPin = null;
+
+function initDash() {
+  const srv = localStorage.getItem('sc_server') || '';
+  updateCamUrl(srv);
+  connectDashWS(srv);
+}
+
+function updateCamUrl(srv) {
+  const base = location.href.split('?')[0];
+  const url = `${base}?mode=camera&server=${encodeURIComponent(srv)}`;
+  document.getElementById('camUrlDisplay').textContent = url;
+}
+
+function connectDashWS(srv) {
+  if (!srv) return;
+  setWsIndicator('connecting', 'Connecting...');
+  try {
+    dashWS = new WebSocket(srv);
+  } catch(e) {
+    setWsIndicator('error', 'Bad WS URL');
+    return;
+  }
+
+  dashWS.onopen = () => {
+    setWsIndicator('connected', 'Server connected');
+  };
+
+  dashWS.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.type === 'camera:online') {
+      setConnMsg('connecting', 'Camera online — creating offer...');
+      await createDashOffer();
+    }
+    if (msg.type === 'camera:offline') {
+      setConnMsg('error', 'Camera went offline');
+      setLivePill(false);
+    }
+    if (msg.type === 'answer' && dashPC) {
+      await dashPC.setRemoteDescription(new RTCSessionDescription(msg.answer));
+    }
+    if (msg.type === 'ice' && dashPC) {
+      try { await dashPC.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e) {}
+    }
+    if (msg.type === 'error') {
+      setConnMsg('error', msg.msg);
+    }
+  };
+
+  dashWS.onclose = () => setWsIndicator('', 'Disconnected');
+  dashWS.onerror = () => setWsIndicator('error', 'WS error');
+}
+
+function setWsIndicator(state, text) {
+  const ind = document.getElementById('wsIndicator');
+  ind.className = 'ws-indicator' + (state ? ' ' + state : '');
+  document.getElementById('wsText').textContent = text;
+}
+
+function setLivePill(on) {
+  const pill = document.getElementById('livePill');
+  pill.className = on ? 'live-pill on' : 'live-pill';
+  document.getElementById('livePillText').textContent = on ? 'Live' : 'No Stream';
+}
+
+function setConnMsg(state, text) {
+  document.getElementById('csd').className = 'csd' + (state ? ' '+state : '');
+  document.getElementById('connMsg').textContent = text;
+}
+
+function dashConnect() {
+  const pin = document.getElementById('pinField').value.trim();
+  if (pin.length !== 4) { alert('Enter a 4-digit PIN.'); return; }
+  if (!dashWS || dashWS.readyState !== WebSocket.OPEN) {
+    alert('Not connected to signaling server. Check your server URL.');
+    return;
+  }
+  currentPin = pin;
+  setConnMsg('connecting', 'Joining session...');
+  dashWS.send(JSON.stringify({ type: 'dashboard:join', pin }));
+  document.getElementById('smPin').textContent = pin;
+}
+
+async function createDashOffer() {
+  if (dashPC) { dashPC.close(); dashPC = null; }
+  dashPC = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+  dashPC.ontrack = e => {
+    const vid = document.getElementById('remoteVideo');
+    vid.srcObject = e.streams[0];
+    document.getElementById('noStream').style.display = 'none';
+    document.getElementById('vidBadge').style.display = 'block';
+    document.getElementById('vidStats').style.display = 'block';
+    document.getElementById('smStat').textContent = 'Connected';
+    document.getElementById('smTime').textContent = new Date().toLocaleTimeString();
+    setLivePill(true);
+    setConnMsg('connected', 'Stream connected ✓');
+    document.getElementById('btnConn').style.display = 'none';
+    document.getElementById('btnDisc').style.display = 'block';
+    startStatsLoop();
+  };
+
+  dashPC.onicecandidate = e => {
+    if (e.candidate && dashWS?.readyState === WebSocket.OPEN) {
+      dashWS.send(JSON.stringify({ type: 'ice', candidate: e.candidate }));
+    }
+  };
+
+  dashPC.onconnectionstatechange = () => {
+    const s = dashPC.connectionState;
+    if (s === 'failed' || s === 'disconnected') {
+      setConnMsg('error', 'Connection lost');
+      setLivePill(false);
+    }
+  };
+
+  const offer = await dashPC.createOffer({ offerToReceiveVideo: true, offerToReceiveAudio: true });
+  await dashPC.setLocalDescription(offer);
+  dashWS.send(JSON.stringify({ type: 'offer', offer }));
+  setConnMsg('connecting', 'Offer sent — waiting for camera...');
+}
+
+function startStatsLoop() {
+  if (statsIv) clearInterval(statsIv);
+  statsIv = setInterval(async () => {
+    if (!dashPC) return;
+    try {
+      const stats = await dashPC.getStats();
+      let fps = '--', res = '--', bytes = 0;
+      stats.forEach(s => {
+        if (s.type === 'inbound-rtp' && s.kind === 'video') {
+          if (s.framesPerSecond) fps = Math.round(s.framesPerSecond) + ' fps';
+          if (s.frameWidth) res = s.frameWidth + '×' + s.frameHeight;
+          if (s.bytesReceived) bytes = s.bytesReceived;
+        }
+      });
+      const kb = bytes ? (bytes/1024).toFixed(0)+' KB recv' : '';
+      document.getElementById('vidStats').textContent = `${res}  ${fps}  ${kb}`;
+      document.getElementById('smRes').textContent = res;
+      document.getElementById('smFps').textContent = fps;
+    } catch(e) {}
+  }, 1500);
+}
+
+function dashDisconnect(silent) {
+  if (dashPC) { dashPC.close(); dashPC = null; }
+  if (statsIv) { clearInterval(statsIv); statsIv = null; }
+  currentPin = null;
+  if (!silent) {
+    document.getElementById('remoteVideo').srcObject = null;
+    document.getElementById('noStream').style.display = 'flex';
+    document.getElementById('vidBadge').style.display = 'none';
+    document.getElementById('vidStats').style.display = 'none';
+    setLivePill(false);
+    setConnMsg('', 'Enter PIN above to connect');
+    ['smStat','smRes','smFps','smTime','smPin'].forEach(id => document.getElementById(id).textContent = '—');
+    document.getElementById('btnConn').style.display = 'block';
+    document.getElementById('btnDisc').style.display = 'none';
+  }
+}
+
+function copyUrl() {
+  const url = document.getElementById('camUrlDisplay').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  CAMERA (iPhone)
+// ═══════════════════════════════════════════════════
+let camStream = null, camPC = null, camWS = null, camPin = null;
+
+function camLog(msg) {
+  const el = document.getElementById('camLog');
+  const t  = new Date().toLocaleTimeString('en-US', {hour12:false});
+  el.innerHTML = `<span style="color:#333">${t}</span> ${msg}<br>` + el.innerHTML;
+}
+
+function setCamStatus(live) {
+  document.getElementById('camDot').className = live ? 'cam-dot live' : 'cam-dot';
+  const lbl = document.getElementById('camLabel');
+  lbl.className = live ? 'cam-label live' : 'cam-label';
+  lbl.textContent = live ? 'Live' : 'Offline';
+}
+
+async function startCam() {
+  const srv = document.getElementById('camServerUrl').value.trim();
+  if (!srv) { alert('Enter your signaling server URL first.'); return; }
+
+  // Store for reconnects
+  localStorage.setItem('sc_server', srv);
+
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: {ideal:1280}, height: {ideal:720} },
+      audio: true
+    });
+    const pv = document.getElementById('camPreview');
+    pv.srcObject = camStream;
+    pv.style.display = 'block';
+
+    const settings = camStream.getVideoTracks()[0].getSettings();
+    document.getElementById('cRes').textContent = `${settings.width||'?'}×${settings.height||'?'}`;
+    document.getElementById('cCam').textContent = settings.facingMode === 'environment' ? 'Rear' : 'Front';
+
+    camPin = Math.floor(1000 + Math.random() * 9000).toString();
+    document.getElementById('bigPin').textContent = camPin;
+    document.getElementById('pinShell').style.display = 'block';
+    document.getElementById('camStatsRow').style.display = 'flex';
+    document.getElementById('btnCamStart').style.display = 'none';
+    document.getElementById('btnCamStop').style.display = 'block';
+    document.getElementById('camTitle').textContent = 'Broadcasting Live';
+    document.getElementById('camSub').textContent = 'Enter this PIN on the dashboard to view.';
+    setCamStatus(true);
+    camLog('Camera ready');
+    connectCamWS(srv);
+  } catch(e) {
+    camLog('Error: ' + e.message);
+    alert('Camera access required. Allow permissions in Safari Settings > StreamCam.');
+  }
+}
+
+function connectCamWS(srv) {
+  camLog('Connecting to server...');
+  try { camWS = new WebSocket(srv); }
+  catch(e) { camLog('Bad server URL'); return; }
+
+  camWS.onopen = () => {
+    camLog('Server connected — registering PIN ' + camPin);
+    camWS.send(JSON.stringify({ type: 'camera:register', pin: camPin }));
+  };
+
+  camWS.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+
+    if (msg.type === 'camera:registered') {
+      camLog('PIN registered. Waiting for dashboard...');
+    }
+    if (msg.type === 'dashboard:ready') {
+      camLog('Dashboard connected — sending offer...');
+      await sendCamOffer();
+    }
+    if (msg.type === 'answer' && camPC) {
+      await camPC.setRemoteDescription(new RTCSessionDescription(msg.answer));
+      camLog('Answer received');
+    }
+    if (msg.type === 'ice' && camPC) {
+      try { await camPC.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e) {}
+    }
+    if (msg.type === 'error') {
+      camLog('Server error: ' + msg.msg);
+    }
+  };
+
+  camWS.onerror = () => camLog('WS error');
+  camWS.onclose = () => { camLog('Server disconnected'); };
+}
+
+async function sendCamOffer() {
+  if (camPC) { camPC.close(); camPC = null; }
+  camPC = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+
+  camStream.getTracks().forEach(t => camPC.addTrack(t, camStream));
+
+  camPC.onicecandidate = e => {
+    if (e.candidate && camWS?.readyState === WebSocket.OPEN) {
+      camWS.send(JSON.stringify({ type: 'ice', candidate: e.candidate }));
+    }
+  };
+
+  camPC.onconnectionstatechange = () => {
+    const s = camPC.connectionState;
+    camLog('State → ' + s);
+    document.getElementById('cViewers').textContent = s === 'connected' ? '1' : '0';
+  };
+
+  const offer = await camPC.createOffer();
+  await camPC.setLocalDescription(offer);
+  camWS.send(JSON.stringify({ type: 'offer', offer }));
+  camLog('Offer sent — awaiting answer...');
+}
+
+function stopCam() {
+  if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  if (camPC)     { camPC.close(); camPC = null; }
+  if (camWS)     { camWS.close(); camWS = null; }
+  camPin = null;
+  document.getElementById('camPreview').style.display = 'none';
+  document.getElementById('camPreview').srcObject = null;
+  document.getElementById('pinShell').style.display = 'none';
+  document.getElementById('camStatsRow').style.display = 'none';
+  document.getElementById('btnCamStart').style.display = 'block';
+  document.getElementById('btnCamStop').style.display = 'none';
+  document.getElementById('camTitle').textContent = 'iPhone Camera';
+  document.getElementById('camSub').textContent = 'Enter your server URL, then tap Start to go live.';
+  document.getElementById('cViewers').textContent = '0';
+  setCamStatus(false);
+  camLog('Stopped.');
+}
+</script>
+</body>
+</html>

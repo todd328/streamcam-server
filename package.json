@@ -1,0 +1,18 @@
+{
+  "name": "streamcam-server",
+  "version": "1.0.0",
+  "description": "WebSocket signaling server for StreamCam iPhone webcam app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "keywords": ["webrtc", "signaling", "websocket", "webcam"],
+  "license": "MIT"
+}
